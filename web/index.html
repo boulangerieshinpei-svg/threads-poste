@@ -120,7 +120,7 @@
       <input type="text" id="memoInput" placeholder="ひとことメモ（例: 朝5時、カンパーニュ30本焼成）" autocomplete="off">
       <button class="btn-primary" id="addBtn">追加</button>
     </div>
-    <div class="hint">追加すると「下書き」でストックされ、翌朝以降の空いている7:00枠が自動で割り当てられます。</div>
+    <div class="hint">追加すると「下書き」でストックされ、次の空いている投稿枠（毎日7時・12時・19時）が自動で割り当てられます。</div>
   </div>
 
   <!-- 一覧 -->
@@ -181,7 +181,7 @@ const FIREBASE_CONFIG = {
 };
 // ============================================================
 
-const POST_HOUR = 7; // 毎朝の投稿時刻（JST想定・端末ローカル時刻で計算）
+const POST_HOURS = [7, 12, 19]; // 1日の投稿枠（この時刻に自動投稿。端末ローカル時刻で計算）
 
 let db = null, storage = null;
 let posts = {}; // key -> post
@@ -339,18 +339,21 @@ function shrinkImage(file, maxSize, quality){
   });
 }
 
-// 翌朝7:00以降で、まだ他の投稿に割り当てられていない最初の日を返す
+// これから先で、まだ他の投稿に割り当てられていない最初の投稿枠（7時/12時/19時）を返す
+function slotKey(d){ return d.toDateString() + "@" + d.getHours(); }
 function nextFreeSlot(){
   const taken = new Set(
     Object.values(posts)
       .filter(p => p.status !== "published" && p.scheduledAt)
-      .map(p => new Date(p.scheduledAt).toDateString() + "@" + new Date(p.scheduledAt).getHours())
+      .map(p => slotKey(new Date(p.scheduledAt)))
   );
+  const now = Date.now();
   const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(POST_HOUR, 0, 0, 0);
   for (let i = 0; i < 365; i++) {
-    if (!taken.has(d.toDateString() + "@" + d.getHours())) return d.getTime();
+    for (const h of POST_HOURS) {
+      d.setHours(h, 0, 0, 0);
+      if (d.getTime() > now && !taken.has(slotKey(d))) return d.getTime();
+    }
     d.setDate(d.getDate() + 1);
   }
   return d.getTime();
