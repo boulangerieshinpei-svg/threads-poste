@@ -47,6 +47,11 @@
   .btn-ok{background:var(--ok);color:#fff;}
   .btn-bad{background:var(--bad-soft);color:var(--bad);}
   .hint{color:var(--ink3);font-size:12px;margin-top:8px;}
+  .cat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .cat-chips button{font-size:12px;font-weight:600;padding:7px 12px;border-radius:999px;
+    background:var(--surface2);color:var(--ink2);border:1px solid var(--line);}
+  .cat-chips button.on{background:var(--acc-soft);color:var(--acc);border-color:var(--acc);}
+  .chip.cat{background:var(--acc-soft);color:var(--acc);font-weight:600;}
 
   /* ===== 一覧 ===== */
   .list-head{display:flex;align-items:baseline;gap:8px;margin:22px 4px 10px;}
@@ -120,6 +125,7 @@
       <input type="text" id="memoInput" placeholder="ひとことメモ（例: 朝5時、カンパーニュ30本焼成）" autocomplete="off">
       <button class="btn-primary" id="addBtn">追加</button>
     </div>
+    <div class="cat-chips" id="catChips"></div>
     <div class="hint">追加すると「下書き」でストックされ、次の空いている投稿枠（毎日7時・12時・19時）が自動で割り当てられます。</div>
   </div>
 
@@ -183,10 +189,14 @@ const FIREBASE_CONFIG = {
 
 const POST_HOURS = [7, 12, 19]; // 1日の投稿枠（この時刻に自動投稿。端末ローカル時刻で計算）
 
+// 投稿カテゴリ（卸営業の定型パターン。フェーズ2のAI文案生成がこれを使う）
+const CATEGORIES = ["供給実績", "用途提案", "製造現場", "柔軟対応", "事例紹介"];
+
 let db = null, storage = null;
 let posts = {}; // key -> post
 let pickedFile = null;
 let editingKey = null;
+let pickedCategory = "";
 
 const $ = id => document.getElementById(id);
 
@@ -247,6 +257,7 @@ function render(){
         <div class="body">
           <div class="meta">
             <span class="chip ${st}">${STATUS_LABEL[st] || st}</span>
+            ${p.category ? `<span class="chip cat">${escapeHtml(p.category)}</span>` : ""}
             <span class="when">${fmtWhen(p.scheduledAt)}</span>
           </div>
           <div class="text" data-act="expand">${escapeHtml(p.text || "")}</div>
@@ -291,6 +302,7 @@ $("addBtn").addEventListener("click", async () => {
     const post = {
       text: memo,
       imageUrl,
+      category: pickedCategory,
       status: "draft",
       scheduledAt: nextFreeSlot(),
       createdAt: Date.now(),
@@ -300,6 +312,8 @@ $("addBtn").addEventListener("click", async () => {
     $("memoInput").value = "";
     $("photoInput").value = "";
     pickedFile = null;
+    pickedCategory = "";
+    renderCatChips();
     $("photoThumb").textContent = "写真を選ぶ";
     toast("ストックに追加しました");
   } catch (err) {
@@ -420,6 +434,24 @@ $("confirmNo").addEventListener("click", () => {
   $("confirmOverlay").classList.remove("show");
   if (confirmResolve) { confirmResolve(false); confirmResolve = null; }
 });
+
+// ===== カテゴリ選択チップ =====
+function renderCatChips(){
+  const box = $("catChips");
+  box.innerHTML = "";
+  for (const c of CATEGORIES) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = c;
+    b.className = pickedCategory === c ? "on" : "";
+    b.addEventListener("click", () => {
+      pickedCategory = (pickedCategory === c) ? "" : c;
+      renderCatChips();
+    });
+    box.appendChild(b);
+  }
+}
+renderCatChips();
 
 // ===== トースト =====
 let toastTimer = null;
