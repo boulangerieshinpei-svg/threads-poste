@@ -43,8 +43,9 @@
 **完了条件**: メモ1行から自然な投稿文が生成され、編集して承認できる
 
 ## フェーズ3: 定時自動投稿
-- Cloud Scheduler → publishScheduled 関数（毎日 07:00 JST）
-- approved かつ scheduledAt が到来している先頭1件を投稿
+- 投稿枠は1日3回: 07:00 / 12:00 / 19:00 JST（管理画面の自動割り当てと同じ枠）
+- Cloud Scheduler → publishScheduled 関数（毎日 07:00 / 12:00 / 19:00 JST に実行）
+- approved かつ scheduledAt が到来している先頭1件を投稿（1回の実行で1件のみ）
 - Threads API 2段階投稿（コンテナ作成 → 公開）。画像があれば IMAGE、なければ TEXT
 - 成功時 status を published に更新、Threads投稿IDを保存
 - 失敗時はリトライ1回、それでも失敗なら status を error にしてエラー内容を保存
