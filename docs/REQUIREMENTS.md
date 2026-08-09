@@ -70,11 +70,12 @@
 ---
 
 ## 事前に手動で済ませること（開発開始前）
-1. Instagramプロアカウント化 ＋ Facebookページ連携（済んでいれば不要）
+1. 投稿先のThreadsアカウントを決める（個人アカウントでOK。Instagramプロアカウント化は不要。
+   試運転は個人アカウントで行い、後で専用アカウントへ切り替える場合は再連携するだけ）
 2. Meta for Developers でアプリ作成、ユースケース「Threads APIにアクセス」を選択
 3. 認証フローで短期トークン取得 → 長期トークン（60日）に交換
 4. App ID / App Secret / 長期トークン / ThreadsユーザーID を控える
-5. Firebase プロジェクト作成（RTDB + Storage + Functions 有効化、Blazeプラン必要）
+5. Firebase プロジェクト作成（RTDB + Storage + Functions 有効化、Blazeプラン必要）→ 済
 
 ## 対象外（今回はやらない）
 - 複数アカウント対応
