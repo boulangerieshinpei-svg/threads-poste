@@ -92,7 +92,8 @@
     padding:10px 12px;font-size:16px;font-family:var(--f);background:var(--surface2);color:var(--ink);}
   .sheet .btns{display:flex;gap:10px;margin-top:16px;}
   .sheet .btns button{flex:1;}
-  .confirm-msg{font-size:14px;line-height:1.6;color:var(--ink);margin:0 0 4px;}
+  .confirm-msg{font-size:14px;line-height:1.6;color:var(--ink);margin:0 0 4px;
+    white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow-y:auto;}
 
   .toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
     transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;
@@ -187,6 +188,10 @@ const FIREBASE_CONFIG = {
 };
 // ============================================================
 
+// 文案生成のCloud Functions URL（フェーズ2をデプロイ後に有効になる）
+const GENERATE_CAPTION_URL =
+  "https://us-central1-threads-poster-2da7a.cloudfunctions.net/generateCaption";
+
 const POST_HOURS = [7, 12, 19]; // 1日の投稿枠（この時刻に自動投稿。端末ローカル時刻で計算）
 
 // 投稿カテゴリ（卸営業の定型パターン。フェーズ2のAI文案生成がこれを使う）
@@ -241,6 +246,7 @@ function render(){
     let actions = "";
     if (st === "draft") {
       actions = `<button class="btn-ok" data-act="approve">承認</button>
+                 <button class="btn-primary" data-act="generate">AI文案</button>
                  <button class="btn-ghost" data-act="edit">編集</button>
                  <button class="btn-bad" data-act="delete">削除</button>`;
     } else if (st === "approved") {
@@ -387,6 +393,8 @@ async function onPostAction(key, e){
   } else if (act === "unapprove") {
     await db.ref(`posts/${key}/status`).set("draft");
     toast("下書きに戻しました");
+  } else if (act === "generate") {
+    await generateCaption(key, e.target.closest("[data-act]"));
   } else if (act === "edit") {
     openEdit(key);
   } else if (act === "delete") {
@@ -395,6 +403,33 @@ async function onPostAction(key, e){
       await db.ref(`posts/${key}`).remove();
       toast("削除しました");
     }
+  }
+}
+
+// ===== AI文案生成 =====
+async function generateCaption(key, btn){
+  const p = posts[key];
+  if (!p || !p.text) { toast("メモが空です。先にメモを入力してください"); return; }
+  if (btn) { btn.disabled = true; btn.textContent = "生成中…"; }
+  try {
+    const r = await fetch(GENERATE_CAPTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memo: p.text, category: p.category || "" }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "生成に失敗しました");
+    // 上書き前に確認モーダルで文案を見せる
+    const ok = await askConfirm("この文案に置き換えますか？\n\n" + data.text);
+    if (ok) {
+      await db.ref(`posts/${key}/text`).set(data.text);
+      toast("文案を反映しました。内容を確認して承認してください");
+    }
+  } catch (err) {
+    console.error(err);
+    toast("生成エラー: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "AI文案"; }
   }
 }
 
