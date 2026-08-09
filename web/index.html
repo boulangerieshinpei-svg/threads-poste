@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Threads Poster</title>
+<style>
+  :root{
+    --bg:#F7F4EF; --surface:#FFFFFF; --surface2:#FBF9F5;
+    --line:#E8E2D8; --ink:#2B2620; --ink2:#7A6F60; --ink3:#B0A694;
+    --acc:#B5763A; --acc-soft:#F3E5D4;
+    --ok:#3E8E5A; --ok-soft:#E2F1E7;
+    --warn:#B08A2E; --warn-soft:#F6EED8;
+    --bad:#B04A4A; --bad-soft:#F6E0E0;
+    --pub:#5A6B8C; --pub-soft:#E4E9F2;
+    --r:14px;
+    --f:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;
+    padding:0 0 calc(24px + env(safe-area-inset-bottom));}
+  header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);
+    padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;gap:8px;}
+  header h1{margin:0;font-size:17px;letter-spacing:.02em;}
+  header .sub{color:var(--ink2);font-size:12px;margin-left:auto;}
+  main{max-width:560px;margin:0 auto;padding:16px;}
+
+  /* ===== 追加フォーム ===== */
+  .add-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;}
+  .photo-pick{display:flex;align-items:center;gap:12px;}
+  .photo-pick .thumb{width:72px;height:72px;border-radius:10px;background:var(--surface2);
+    border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;
+    color:var(--ink3);font-size:11px;overflow:hidden;flex-shrink:0;}
+  .photo-pick .thumb img{width:100%;height:100%;object-fit:cover;}
+  .photo-pick input[type=file]{display:none;}
+  .memo-row{display:flex;gap:8px;margin-top:12px;}
+  input[type=text],textarea{width:100%;border:1px solid var(--line);border-radius:10px;
+    padding:11px 12px;font-size:16px;font-family:var(--f);background:var(--surface2);color:var(--ink);
+    -webkit-appearance:none;}
+  input[type=text]:focus,textarea:focus{outline:none;border-color:var(--acc);}
+  button{font-family:var(--f);border:none;border-radius:10px;font-size:14px;font-weight:600;
+    padding:11px 16px;cursor:pointer;-webkit-appearance:none;}
+  button:active{opacity:.75;}
+  button:disabled{opacity:.4;pointer-events:none;}
+  .btn-primary{background:var(--acc);color:#fff;white-space:nowrap;}
+  .btn-ghost{background:transparent;color:var(--ink2);border:1px solid var(--line);}
+  .btn-ok{background:var(--ok);color:#fff;}
+  .btn-bad{background:var(--bad-soft);color:var(--bad);}
+  .hint{color:var(--ink3);font-size:12px;margin-top:8px;}
+
+  /* ===== 一覧 ===== */
+  .list-head{display:flex;align-items:baseline;gap:8px;margin:22px 4px 10px;}
+  .list-head h2{margin:0;font-size:14px;color:var(--ink2);font-weight:600;}
+  .list-head .count{color:var(--ink3);font-size:12px;}
+  .post{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:12px;margin-bottom:10px;}
+  .post .top{display:flex;gap:12px;}
+  .post .img{width:64px;height:64px;border-radius:10px;object-fit:cover;flex-shrink:0;
+    background:var(--surface2);}
+  .post .noimg{display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:10px;}
+  .post .body{flex:1;min-width:0;}
+  .post .meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .chip{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;}
+  .chip.draft{background:var(--warn-soft);color:var(--warn);}
+  .chip.approved{background:var(--ok-soft);color:var(--ok);}
+  .chip.published{background:var(--pub-soft);color:var(--pub);}
+  .chip.error{background:var(--bad-soft);color:var(--bad);}
+  .post .when{color:var(--ink2);font-size:12px;}
+  .post .text{font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .post .text.open{display:block;}
+  .post .actions{display:flex;gap:8px;margin-top:10px;}
+  .post .actions button{padding:8px 14px;font-size:13px;flex:none;}
+  .empty{color:var(--ink3);text-align:center;padding:40px 0;font-size:13px;}
+
+  /* ===== モーダル ===== */
+  .overlay{position:fixed;inset:0;background:rgba(30,25,18,.45);display:none;
+    align-items:flex-end;justify-content:center;z-index:100;}
+  .overlay.show{display:flex;}
+  .sheet{background:var(--surface);border-radius:18px 18px 0 0;width:100%;max-width:560px;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom));}
+  .sheet h3{margin:0 0 14px;font-size:15px;}
+  .sheet .row{margin-bottom:12px;}
+  .sheet label{display:block;font-size:12px;color:var(--ink2);margin-bottom:5px;}
+  .sheet textarea{min-height:110px;resize:vertical;font-size:16px;line-height:1.55;}
+  .sheet input[type=datetime-local]{width:100%;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;font-size:16px;font-family:var(--f);background:var(--surface2);color:var(--ink);}
+  .sheet .btns{display:flex;gap:10px;margin-top:16px;}
+  .sheet .btns button{flex:1;}
+  .confirm-msg{font-size:14px;line-height:1.6;color:var(--ink);margin:0 0 4px;}
+
+  .toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
+    transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;
+    padding:10px 18px;border-radius:999px;opacity:0;transition:opacity .25s;z-index:200;
+    pointer-events:none;white-space:nowrap;}
+  .toast.show{opacity:.95;}
+  .config-warn{background:var(--bad-soft);color:var(--bad);border-radius:var(--r);
+    padding:14px;font-size:13px;line-height:1.6;margin-bottom:14px;display:none;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Threads Poster</h1>
+  <span class="sub">投稿ストック管理</span>
+</header>
+
+<main>
+  <div id="configWarn" class="config-warn">
+    Firebaseの設定がまだです。index.html 冒頭の FIREBASE_CONFIG を自分のプロジェクトの値に書き換えてください。
+  </div>
+
+  <!-- 追加フォーム: 写真1枚＋テキスト1行のみ -->
+  <div class="add-card">
+    <label class="photo-pick" id="photoPick">
+      <span class="thumb" id="photoThumb">写真を選ぶ</span>
+      <span class="hint" style="margin:0;">タップして写真を選択（なしでもOK）</span>
+      <input type="file" id="photoInput" accept="image/*">
+    </label>
+    <div class="memo-row">
+      <input type="text" id="memoInput" placeholder="ひとことメモ（例: 朝5時、カンパーニュ30本焼成）" autocomplete="off">
+      <button class="btn-primary" id="addBtn">追加</button>
+    </div>
+    <div class="hint">追加すると「下書き」でストックされ、翌朝以降の空いている7:00枠が自動で割り当てられます。</div>
+  </div>
+
+  <!-- 一覧 -->
+  <div class="list-head">
+    <h2>ストック</h2>
+    <span class="count" id="countLabel"></span>
+  </div>
+  <div id="postList"></div>
+  <div class="empty" id="emptyLabel" style="display:none;">まだ投稿ネタがありません</div>
+</main>
+
+<!-- 編集モーダル -->
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <h3>投稿を編集</h3>
+    <div class="row">
+      <label>投稿文</label>
+      <textarea id="editText"></textarea>
+    </div>
+    <div class="row">
+      <label>投稿予定日時</label>
+      <input type="datetime-local" id="editWhen">
+    </div>
+    <div class="btns">
+      <button class="btn-ghost" id="editCancel">キャンセル</button>
+      <button class="btn-primary" id="editSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 確認モーダル（confirm() はiPhoneで動かないため自前実装） -->
+<div class="overlay" id="confirmOverlay">
+  <div class="sheet">
+    <p class="confirm-msg" id="confirmMsg"></p>
+    <div class="btns">
+      <button class="btn-ghost" id="confirmNo">やめる</button>
+      <button class="btn-bad" id="confirmYes">実行する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script>
+"use strict";
+
+// ===== Firebase設定: 自分のプロジェクトの値に書き換える =====
+const FIREBASE_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  appId: "YOUR_APP_ID"
+};
+// ============================================================
+
+const POST_HOUR = 7; // 毎朝の投稿時刻（JST想定・端末ローカル時刻で計算）
+
+let db = null, storage = null;
+let posts = {}; // key -> post
+let pickedFile = null;
+let editingKey = null;
+
+const $ = id => document.getElementById(id);
+
+function init(){
+  if (FIREBASE_CONFIG.apiKey === "YOUR_API_KEY") {
+    $("configWarn").style.display = "block";
+    return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+  storage = firebase.storage();
+  db.ref("posts").on("value", snap => {
+    posts = snap.val() || {};
+    render();
+  });
+}
+
+// ===== 表示 =====
+function fmtWhen(ts){
+  if (!ts) return "未定";
+  const d = new Date(ts);
+  const w = ["日","月","火","水","木","金","土"][d.getDay()];
+  return `${d.getMonth()+1}/${d.getDate()}(${w}) ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+
+const STATUS_LABEL = { draft:"下書き", approved:"承認済み", published:"投稿済み", error:"エラー" };
+
+function render(){
+  const list = $("postList");
+  const entries = Object.entries(posts)
+    .sort((a,b) => (a[1].scheduledAt||0) - (b[1].scheduledAt||0));
+  $("countLabel").textContent = entries.length ? `${entries.length}件` : "";
+  $("emptyLabel").style.display = entries.length ? "none" : "block";
+  list.innerHTML = "";
+  for (const [key, p] of entries) {
+    const el = document.createElement("div");
+    el.className = "post";
+    const st = p.status || "draft";
+    const img = p.imageUrl
+      ? `<img class="img" src="${p.imageUrl}" alt="" loading="lazy">`
+      : `<div class="img noimg">画像なし</div>`;
+    let actions = "";
+    if (st === "draft") {
+      actions = `<button class="btn-ok" data-act="approve">承認</button>
+                 <button class="btn-ghost" data-act="edit">編集</button>
+                 <button class="btn-bad" data-act="delete">削除</button>`;
+    } else if (st === "approved") {
+      actions = `<button class="btn-ghost" data-act="unapprove">差し戻し</button>
+                 <button class="btn-ghost" data-act="edit">編集</button>
+                 <button class="btn-bad" data-act="delete">削除</button>`;
+    } else if (st === "error") {
+      actions = `<button class="btn-ghost" data-act="unapprove">下書きに戻す</button>
+                 <button class="btn-bad" data-act="delete">削除</button>`;
+    }
+    el.innerHTML = `
+      <div class="top">
+        ${img}
+        <div class="body">
+          <div class="meta">
+            <span class="chip ${st}">${STATUS_LABEL[st] || st}</span>
+            <span class="when">${fmtWhen(p.scheduledAt)}</span>
+          </div>
+          <div class="text" data-act="expand">${escapeHtml(p.text || "")}</div>
+        </div>
+      </div>
+      ${actions ? `<div class="actions">${actions}</div>` : ""}
+      ${st === "error" && p.lastError ? `<div class="hint">エラー: ${escapeHtml(p.lastError)}</div>` : ""}`;
+    el.addEventListener("click", e => onPostAction(key, e));
+    list.appendChild(el);
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// ===== 追加 =====
+$("photoInput").addEventListener("change", e => {
+  pickedFile = e.target.files[0] || null;
+  const thumb = $("photoThumb");
+  if (pickedFile) {
+    const url = URL.createObjectURL(pickedFile);
+    thumb.innerHTML = `<img src="${url}" alt="">`;
+  } else {
+    thumb.textContent = "写真を選ぶ";
+  }
+});
+
+$("addBtn").addEventListener("click", async () => {
+  const memo = $("memoInput").value.trim();
+  if (!memo && !pickedFile) { toast("写真かメモのどちらかは必要です"); return; }
+  if (!db) { toast("Firebase未設定です"); return; }
+  const btn = $("addBtn");
+  btn.disabled = true;
+  try {
+    let imageUrl = "";
+    if (pickedFile) {
+      toast("写真をアップロード中…");
+      imageUrl = await uploadPhoto(pickedFile);
+    }
+    const post = {
+      text: memo,
+      imageUrl,
+      status: "draft",
+      scheduledAt: nextFreeSlot(),
+      createdAt: Date.now(),
+      insights: null
+    };
+    await db.ref("posts").push(post);
+    $("memoInput").value = "";
+    $("photoInput").value = "";
+    pickedFile = null;
+    $("photoThumb").textContent = "写真を選ぶ";
+    toast("ストックに追加しました");
+  } catch (err) {
+    console.error(err);
+    toast("追加に失敗: " + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// iPhoneの巨大写真を縮小してJPEG化してからアップロード
+async function uploadPhoto(file){
+  const blob = await shrinkImage(file, 1920, 0.85);
+  const name = `photos/${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+  const ref = storage.ref(name);
+  await ref.put(blob, { contentType: "image/jpeg" });
+  return await ref.getDownloadURL();
+}
+
+function shrinkImage(file, maxSize, quality){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width: w, height: h } = img;
+      if (Math.max(w, h) > maxSize) {
+        const r = maxSize / Math.max(w, h);
+        w = Math.round(w * r); h = Math.round(h * r);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error("画像変換に失敗")), "image/jpeg", quality);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => reject(new Error("画像を読み込めませんでした"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// 翌朝7:00以降で、まだ他の投稿に割り当てられていない最初の日を返す
+function nextFreeSlot(){
+  const taken = new Set(
+    Object.values(posts)
+      .filter(p => p.status !== "published" && p.scheduledAt)
+      .map(p => new Date(p.scheduledAt).toDateString() + "@" + new Date(p.scheduledAt).getHours())
+  );
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(POST_HOUR, 0, 0, 0);
+  for (let i = 0; i < 365; i++) {
+    if (!taken.has(d.toDateString() + "@" + d.getHours())) return d.getTime();
+    d.setDate(d.getDate() + 1);
+  }
+  return d.getTime();
+}
+
+// ===== 一覧アクション =====
+async function onPostAction(key, e){
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (!act) return;
+  const p = posts[key];
+  if (!p) return;
+  if (act === "expand") {
+    e.target.classList.toggle("open");
+  } else if (act === "approve") {
+    await db.ref(`posts/${key}/status`).set("approved");
+    toast("承認しました。" + fmtWhen(p.scheduledAt) + " に投稿予定");
+  } else if (act === "unapprove") {
+    await db.ref(`posts/${key}/status`).set("draft");
+    toast("下書きに戻しました");
+  } else if (act === "edit") {
+    openEdit(key);
+  } else if (act === "delete") {
+    const ok = await askConfirm("この投稿ネタを削除しますか？");
+    if (ok) {
+      await db.ref(`posts/${key}`).remove();
+      toast("削除しました");
+    }
+  }
+}
+
+// ===== 編集モーダル =====
+function openEdit(key){
+  editingKey = key;
+  const p = posts[key];
+  $("editText").value = p.text || "";
+  const d = new Date(p.scheduledAt || Date.now());
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  $("editWhen").value = d.toISOString().slice(0, 16);
+  $("editOverlay").classList.add("show");
+}
+$("editCancel").addEventListener("click", () => $("editOverlay").classList.remove("show"));
+$("editSave").addEventListener("click", async () => {
+  if (!editingKey) return;
+  const text = $("editText").value.trim();
+  const when = $("editWhen").value ? new Date($("editWhen").value).getTime() : null;
+  await db.ref(`posts/${editingKey}`).update({ text, scheduledAt: when });
+  $("editOverlay").classList.remove("show");
+  editingKey = null;
+  toast("保存しました");
+});
+
+// ===== 確認モーダル =====
+let confirmResolve = null;
+function askConfirm(msg){
+  $("confirmMsg").textContent = msg;
+  $("confirmOverlay").classList.add("show");
+  return new Promise(resolve => { confirmResolve = resolve; });
+}
+$("confirmYes").addEventListener("click", () => {
+  $("confirmOverlay").classList.remove("show");
+  if (confirmResolve) { confirmResolve(true); confirmResolve = null; }
+});
+$("confirmNo").addEventListener("click", () => {
+  $("confirmOverlay").classList.remove("show");
+  if (confirmResolve) { confirmResolve(false); confirmResolve = null; }
+});
+
+// ===== トースト =====
+let toastTimer = null;
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+init();
+</script>
+</body>
+</html>
