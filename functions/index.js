@@ -27,6 +27,31 @@ exports.generateCaption = onRequest(
     }
 
     try {
+      // 管理画面で保存された口調設定と、★が付いた投稿（お手本）を反映する
+      const [voiceSnap, postsSnap] = await Promise.all([
+        admin.database().ref("voice/custom").get(),
+        admin.database().ref("posts").get(),
+      ]);
+      const customVoice = String(voiceSnap.val() || "").trim();
+      const favorites = [];
+      postsSnap.forEach((child) => {
+        const p = child.val();
+        if (p.favorite && p.text) favorites.push(p);
+      });
+      favorites.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const examples = favorites
+        .slice(0, 3)
+        .map((p, i) => `【お手本${i + 1}】\n${p.text}`)
+        .join("\n\n");
+
+      let systemText = VOICE_PROMPT;
+      if (customVoice) {
+        systemText += `\n\n## 追加の口調・キャラ指示（本人による設定。優先して従うこと）\n${customVoice}`;
+      }
+      if (examples) {
+        systemText += `\n\n## 本人が「良い」と印を付けた投稿の実例（この雰囲気に寄せること）\n${examples}`;
+      }
+
       const client = new Anthropic();
       const response = await client.beta.messages.create({
         model: "claude-opus-5",
@@ -35,7 +60,7 @@ exports.generateCaption = onRequest(
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: [
-          { type: "text", text: VOICE_PROMPT, cache_control: { type: "ephemeral" } },
+          { type: "text", text: systemText, cache_control: { type: "ephemeral" } },
         ],
         messages: [
           {

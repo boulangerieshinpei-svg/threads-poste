@@ -23,6 +23,7 @@
     padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;gap:8px;}
   header h1{margin:0;font-size:17px;letter-spacing:.02em;}
   header .sub{color:var(--ink2);font-size:12px;margin-left:auto;}
+  .gear{background:none;border:none;font-size:18px;padding:2px 4px;margin-left:10px;line-height:1;}
   main{max-width:560px;margin:0 auto;padding:16px;}
 
   /* ===== 追加フォーム ===== */
@@ -115,6 +116,7 @@
 <header>
   <h1>Threads Poster</h1>
   <span class="sub">投稿ストック管理</span>
+  <button class="gear" id="settingsBtn" title="口調・キャラ設定">⚙️</button>
 </header>
 
 <main>
@@ -162,6 +164,22 @@
     <div class="btns">
       <button class="btn-ghost" id="editCancel">キャンセル</button>
       <button class="btn-primary" id="editSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 口調・キャラ設定モーダル -->
+<div class="overlay" id="voiceOverlay">
+  <div class="sheet">
+    <h3>口調・キャラ設定</h3>
+    <div class="row">
+      <label>AIへの追加指示（自由に書いてOK。例:「もう少し柔らかく」「たまに現場の失敗談も混ぜる」「一人称は僕」）</label>
+      <textarea id="voiceInput" placeholder="ここに書いた内容は、次のAI文案生成から反映されます"></textarea>
+    </div>
+    <div class="hint">💡 ★を付けた投稿は自動で「お手本」としてAIに渡されます（最新3件）。良い投稿に★を付けるほど、生成があなたの好みに育ちます。</div>
+    <div class="btns">
+      <button class="btn-ghost" id="voiceCancel">閉じる</button>
+      <button class="btn-primary" id="voiceSave">保存</button>
     </div>
   </div>
 </div>
@@ -471,6 +489,28 @@ $("editSave").addEventListener("click", async () => {
   $("editOverlay").classList.remove("show");
   editingKey = null;
   toast("保存しました");
+});
+
+// ===== 口調・キャラ設定 =====
+$("settingsBtn").addEventListener("click", async () => {
+  if (!db) { toast("Firebase未設定です"); return; }
+  try {
+    const snap = await db.ref("voice/custom").get();
+    $("voiceInput").value = snap.val() || "";
+  } catch (e) {
+    $("voiceInput").value = "";
+  }
+  $("voiceOverlay").classList.add("show");
+});
+$("voiceCancel").addEventListener("click", () => $("voiceOverlay").classList.remove("show"));
+$("voiceSave").addEventListener("click", async () => {
+  try {
+    await db.ref("voice/custom").set($("voiceInput").value.trim());
+    $("voiceOverlay").classList.remove("show");
+    toast("保存しました。次のAI文案から反映されます");
+  } catch (err) {
+    toast("保存エラー: " + err.message);
+  }
 });
 
 // ===== 確認モーダル =====
