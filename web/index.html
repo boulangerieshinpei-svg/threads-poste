@@ -34,6 +34,7 @@
     color:var(--ink3);font-size:11px;overflow:hidden;flex-shrink:0;}
   .photo-pick .thumb img{width:100%;height:100%;object-fit:cover;}
   .photo-pick input[type=file]{display:none;}
+  .clear-photo{margin-top:8px;padding:6px 12px;font-size:12px;}
   .memo-row{display:flex;gap:8px;margin-top:12px;}
   input[type=text],textarea{width:100%;border:1px solid var(--line);border-radius:10px;
     padding:11px 12px;font-size:16px;font-family:var(--f);background:var(--surface2);color:var(--ink);
@@ -126,11 +127,16 @@
 
   <!-- 追加フォーム: 写真1枚＋テキスト1行のみ -->
   <div class="add-card">
-    <label class="photo-pick" id="photoPick">
-      <span class="thumb" id="photoThumb">写真を選ぶ</span>
-      <span class="hint" style="margin:0;">タップして写真を選択（なしでもOK）</span>
-      <input type="file" id="photoInput" accept="image/*">
-    </label>
+    <div class="photo-pick">
+      <label>
+        <span class="thumb" id="photoThumb">写真を選ぶ</span>
+        <input type="file" id="photoInput" accept="image/*">
+      </label>
+      <div>
+        <div class="hint" style="margin:0;">タップして写真を選択（なしでもOK）</div>
+        <button type="button" class="btn-ghost clear-photo" id="clearPhotoBtn" style="display:none;">写真を外す</button>
+      </div>
+    </div>
     <div class="memo-row">
       <input type="text" id="memoInput" placeholder="ひとことメモ（例: 朝5時、カンパーニュ30本焼成）" autocomplete="off">
       <button class="btn-primary" id="addBtn">追加</button>
@@ -160,6 +166,13 @@
     <div class="row">
       <label>投稿予定日時</label>
       <input type="datetime-local" id="editWhen">
+    </div>
+    <div class="row" id="editPhotoRow" style="display:none;">
+      <label>写真</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <img id="editPhotoThumb" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover;">
+        <button type="button" class="btn-bad clear-photo" id="editRemovePhoto" style="margin:0;">写真を削除</button>
+      </div>
     </div>
     <div class="btns">
       <button class="btn-ghost" id="editCancel">キャンセル</button>
@@ -323,9 +336,18 @@ $("photoInput").addEventListener("change", e => {
   if (pickedFile) {
     const url = URL.createObjectURL(pickedFile);
     thumb.innerHTML = `<img src="${url}" alt="">`;
+    $("clearPhotoBtn").style.display = "";
   } else {
     thumb.textContent = "写真を選ぶ";
+    $("clearPhotoBtn").style.display = "none";
   }
+});
+
+$("clearPhotoBtn").addEventListener("click", () => {
+  pickedFile = null;
+  $("photoInput").value = "";
+  $("photoThumb").textContent = "写真を選ぶ";
+  $("clearPhotoBtn").style.display = "none";
 });
 
 $("addBtn").addEventListener("click", async () => {
@@ -356,6 +378,7 @@ $("addBtn").addEventListener("click", async () => {
     pickedCategory = "";
     renderCatChips();
     $("photoThumb").textContent = "写真を選ぶ";
+    $("clearPhotoBtn").style.display = "none";
     toast("ストックに追加しました");
   } catch (err) {
     console.error(err);
@@ -478,8 +501,31 @@ function openEdit(key){
   const d = new Date(p.scheduledAt || Date.now());
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   $("editWhen").value = d.toISOString().slice(0, 16);
+  if (p.imageUrl) {
+    $("editPhotoThumb").src = p.imageUrl;
+    $("editPhotoRow").style.display = "";
+  } else {
+    $("editPhotoRow").style.display = "none";
+  }
   $("editOverlay").classList.add("show");
 }
+
+$("editRemovePhoto").addEventListener("click", async () => {
+  if (!editingKey) return;
+  const p = posts[editingKey];
+  if (!p || !p.imageUrl) return;
+  const ok = await askConfirm("この投稿から写真を削除しますか？");
+  if (!ok) return;
+  try {
+    // Storage上の実ファイルも消す（失敗しても投稿からは外す）
+    try { await storage.refFromURL(p.imageUrl).delete(); } catch (e) { console.warn(e); }
+    await db.ref(`posts/${editingKey}/imageUrl`).set("");
+    $("editPhotoRow").style.display = "none";
+    toast("写真を削除しました");
+  } catch (err) {
+    toast("削除エラー: " + err.message);
+  }
+});
 $("editCancel").addEventListener("click", () => $("editOverlay").classList.remove("show"));
 $("editSave").addEventListener("click", async () => {
   if (!editingKey) return;
