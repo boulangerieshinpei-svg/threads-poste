@@ -54,6 +54,13 @@
   .chip.cat{background:var(--acc-soft);color:var(--acc);font-weight:600;}
 
   /* ===== 一覧 ===== */
+  .filter-bar{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding:2px 2px 6px;
+    -webkit-overflow-scrolling:touch;}
+  .filter-bar button{flex:none;font-size:12px;font-weight:600;padding:7px 12px;border-radius:999px;
+    background:var(--surface);color:var(--ink2);border:1px solid var(--line);}
+  .filter-bar button.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .fav-btn{background:none;border:none;font-size:17px;color:var(--ink3);padding:0 4px;margin-left:auto;line-height:1;}
+  .fav-btn.on{color:var(--warn);}
   .list-head{display:flex;align-items:baseline;gap:8px;margin:22px 4px 10px;}
   .list-head h2{margin:0;font-size:14px;color:var(--ink2);font-weight:600;}
   .list-head .count{color:var(--ink3);font-size:12px;}
@@ -135,6 +142,7 @@
     <h2>ストック</h2>
     <span class="count" id="countLabel"></span>
   </div>
+  <div class="filter-bar" id="filterBar"></div>
   <div id="postList"></div>
   <div class="empty" id="emptyLabel" style="display:none;">まだ投稿ネタがありません</div>
 </main>
@@ -229,9 +237,17 @@ function fmtWhen(ts){
 
 const STATUS_LABEL = { draft:"下書き", approved:"承認済み", published:"投稿済み", error:"エラー" };
 
+let filterStatus = "";
+let filterCategory = "";
+let filterFav = false;
+
 function render(){
   const list = $("postList");
   const entries = Object.entries(posts)
+    .filter(([k, p]) =>
+      (!filterStatus || (p.status || "draft") === filterStatus) &&
+      (!filterCategory || p.category === filterCategory) &&
+      (!filterFav || p.favorite))
     .sort((a,b) => (a[1].scheduledAt||0) - (b[1].scheduledAt||0));
   $("countLabel").textContent = entries.length ? `${entries.length}件` : "";
   $("emptyLabel").style.display = entries.length ? "none" : "block";
@@ -265,6 +281,7 @@ function render(){
             <span class="chip ${st}">${STATUS_LABEL[st] || st}</span>
             ${p.category ? `<span class="chip cat">${escapeHtml(p.category)}</span>` : ""}
             <span class="when">${fmtWhen(p.scheduledAt)}</span>
+            <button class="fav-btn ${p.favorite ? "on" : ""}" data-act="fav" title="残す">★</button>
           </div>
           <div class="text" data-act="expand">${escapeHtml(p.text || "")}</div>
         </div>
@@ -387,6 +404,8 @@ async function onPostAction(key, e){
   if (!p) return;
   if (act === "expand") {
     e.target.classList.toggle("open");
+  } else if (act === "fav") {
+    await db.ref(`posts/${key}/favorite`).set(!p.favorite);
   } else if (act === "approve") {
     await db.ref(`posts/${key}/status`).set("approved");
     toast("承認しました。" + fmtWhen(p.scheduledAt) + " に投稿予定");
@@ -469,6 +488,42 @@ $("confirmNo").addEventListener("click", () => {
   $("confirmOverlay").classList.remove("show");
   if (confirmResolve) { confirmResolve(false); confirmResolve = null; }
 });
+
+// ===== 絞り込みバー =====
+const STATUS_FILTERS = [
+  ["", "すべて"], ["draft", "下書き"], ["approved", "承認済み"],
+  ["published", "投稿済み"], ["error", "エラー"],
+];
+function renderFilterBar(){
+  const bar = $("filterBar");
+  bar.innerHTML = "";
+  for (const [val, label] of STATUS_FILTERS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.className = filterStatus === val ? "on" : "";
+    b.addEventListener("click", () => { filterStatus = val; renderFilterBar(); render(); });
+    bar.appendChild(b);
+  }
+  const fav = document.createElement("button");
+  fav.type = "button";
+  fav.textContent = "★残す";
+  fav.className = filterFav ? "on" : "";
+  fav.addEventListener("click", () => { filterFav = !filterFav; renderFilterBar(); render(); });
+  bar.appendChild(fav);
+  for (const c of CATEGORIES) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = c;
+    b.className = filterCategory === c ? "on" : "";
+    b.addEventListener("click", () => {
+      filterCategory = (filterCategory === c) ? "" : c;
+      renderFilterBar(); render();
+    });
+    bar.appendChild(b);
+  }
+}
+renderFilterBar();
 
 // ===== カテゴリ選択チップ =====
 function renderCatChips(){
