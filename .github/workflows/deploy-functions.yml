@@ -1,0 +1,42 @@
+name: Deploy Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - "firebase.json"
+      - ".firebaserc"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create functions/.env from secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          DRY_RUN: ${{ vars.DRY_RUN }}
+        run: |
+          {
+            echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+            echo "THREADS_ACCESS_TOKEN=${THREADS_ACCESS_TOKEN}"
+            echo "THREADS_USER_ID=${THREADS_USER_ID}"
+            echo "DRY_RUN=${DRY_RUN:-true}"
+          } > functions/.env
+
+      - name: Install dependencies
+        run: npm install --prefix functions
+
+      - name: Deploy to Firebase
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: npx firebase-tools@14 deploy --only functions --project threads-poster-2da7a --non-interactive --force
