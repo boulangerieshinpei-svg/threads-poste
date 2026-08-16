@@ -18,7 +18,7 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:14px;
-    padding:0 0 calc(24px + env(safe-area-inset-bottom));}
+    padding:0 0 calc(74px + env(safe-area-inset-bottom));}
   header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);
     padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;gap:8px;}
   header h1{margin:0;font-size:15px;letter-spacing:.02em;}
@@ -122,7 +122,36 @@
   .confirm-msg{font-size:14px;line-height:1.6;color:var(--ink);margin:0 0 4px;
     white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow-y:auto;}
 
-  .toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
+  /* ===== 下タブバー ===== */
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);
+    border-top:1px solid var(--line);display:flex;
+    padding-bottom:env(safe-area-inset-bottom);}
+  .tabbar button{flex:1;background:none;border:none;border-radius:0;padding:7px 0 6px;
+    font-size:10px;font-weight:600;color:var(--ink3);display:flex;flex-direction:column;
+    align-items:center;gap:1px;}
+  .tabbar button .ico{font-size:19px;line-height:1.2;}
+  .tabbar button.on{color:var(--acc);}
+
+  /* ===== 分析タブ ===== */
+  .an-totals{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px;}
+  .an-cell{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:8px 4px;text-align:center;}
+  .an-cell b{display:block;font-size:16px;}
+  .an-cell span{font-size:10px;color:var(--ink2);}
+  .an-rank{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:9px 10px;margin-bottom:7px;}
+  .an-rank .r-top{display:flex;gap:8px;align-items:center;margin-bottom:4px;font-size:11px;color:var(--ink2);}
+  .an-rank .r-no{font-size:13px;font-weight:800;color:var(--acc);flex:none;}
+  .an-rank .r-text{font-size:12px;line-height:1.5;color:var(--ink);white-space:pre-wrap;
+    word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .an-rank .r-text.open{display:block;}
+  .an-cat{display:flex;align-items:center;gap:8px;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;font-size:12px;}
+  .an-cat .bar{flex:1;height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;}
+  .an-cat .bar i{display:block;height:100%;background:var(--acc);border-radius:99px;}
+  .an-cat b{min-width:36px;text-align:right;}
+
+  .toast{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));
     transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;
     padding:10px 18px;border-radius:999px;opacity:0;transition:opacity .25s;z-index:200;
     pointer-events:none;white-space:nowrap;}
@@ -135,13 +164,15 @@
 <header>
   <h1>Threads Poster</h1>
   <span class="sub">投稿ストック管理</span>
-  <button class="gear" id="settingsBtn" title="口調・キャラ設定">⚙️</button>
 </header>
 
 <main>
   <div id="configWarn" class="config-warn">
     Firebaseの設定がまだです。index.html 冒頭の FIREBASE_CONFIG を自分のプロジェクトの値に書き換えてください。
   </div>
+
+<!-- ============ タブ1: 投稿 ============ -->
+<section id="tab-posts">
 
   <!-- 次の自動投稿サマリー -->
   <div class="summary" id="summaryCard" style="display:none;">
@@ -179,7 +210,57 @@
   <div class="filter-bar" id="filterBar"></div>
   <div id="postList"></div>
   <div class="empty" id="emptyLabel" style="display:none;">まだ投稿ネタがありません</div>
+
+</section>
+
+<!-- ============ タブ2: 分析 ============ -->
+<section id="tab-analytics" style="display:none;">
+  <div class="hint" style="margin:2px 2px 8px;">反応の数字は毎朝6:30に自動更新されます（投稿の翌朝以降に反映）</div>
+  <div class="an-totals" id="anTotals"></div>
+  <div class="list-head">
+    <h2>反応ランキング</h2>
+    <span class="count">閲覧数順</span>
+  </div>
+  <div id="anRanking"></div>
+  <div class="list-head">
+    <h2>カテゴリ別の伸び</h2>
+    <span class="count">平均閲覧数</span>
+  </div>
+  <div id="anCats"></div>
+</section>
+
+<!-- ============ タブ3: 設定 ============ -->
+<section id="tab-settings" style="display:none;">
+  <div class="list-head" style="margin-top:4px;">
+    <h2>口調・キャラ設定</h2>
+  </div>
+  <div class="add-card">
+    <label class="hint" style="display:block;margin:0 0 6px;">AIへの追加指示（自由に書いてOK。例:「もう少し柔らかく」「たまに現場の失敗談も混ぜる」「一人称は僕」）</label>
+    <textarea id="voiceInput" placeholder="ここに書いた内容は、次のAI文案生成から反映されます" style="min-height:120px;resize:vertical;"></textarea>
+    <div class="hint">💡 ★を付けた投稿は自動で「お手本」としてAIに渡されます（最新3件）。良い投稿に★を付けるほど、生成があなたの好みに育ちます。</div>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+      <button class="btn-primary" id="voiceSave">保存</button>
+    </div>
+  </div>
+  <div class="list-head">
+    <h2>自動運転の状況</h2>
+  </div>
+  <div class="add-card hint" style="line-height:1.9;margin-top:0;">
+    自動投稿: 毎日 7:00 / 12:00 / 19:00<br>
+    反応データの取得: 毎朝 6:30<br>
+    Threads連携の自動更新: 毎週月曜 4:00<br>
+    <span id="tokenInfo"></span>
+  </div>
+</section>
+
 </main>
+
+<!-- 下タブバー -->
+<nav class="tabbar">
+  <button class="on" data-tab="posts"><span class="ico">📝</span>投稿</button>
+  <button data-tab="analytics"><span class="ico">📊</span>分析</button>
+  <button data-tab="settings"><span class="ico">⚙️</span>設定</button>
+</nav>
 
 <!-- 編集モーダル -->
 <div class="overlay" id="editOverlay">
@@ -207,18 +288,21 @@
   </div>
 </div>
 
-<!-- 口調・キャラ設定モーダル -->
-<div class="overlay" id="voiceOverlay">
+<!-- この型で新作モーダル（分析タブから） -->
+<div class="overlay" id="remixOverlay">
   <div class="sheet">
-    <h3>口調・キャラ設定</h3>
+    <h3>この型で新作を作る</h3>
     <div class="row">
-      <label>AIへの追加指示（自由に書いてOK。例:「もう少し柔らかく」「たまに現場の失敗談も混ぜる」「一人称は僕」）</label>
-      <textarea id="voiceInput" placeholder="ここに書いた内容は、次のAI文案生成から反映されます"></textarea>
+      <label>お手本にする投稿（反応が良かったもの）</label>
+      <p class="confirm-msg" id="remixRef" style="font-size:12px;color:var(--ink2);max-height:20vh;"></p>
     </div>
-    <div class="hint">💡 ★を付けた投稿は自動で「お手本」としてAIに渡されます（最新3件）。良い投稿に★を付けるほど、生成があなたの好みに育ちます。</div>
+    <div class="row">
+      <label>新しいネタ（メモ1行でOK）</label>
+      <textarea id="remixMemo" placeholder="例: 明日はベーグル200個焼成、ホテル向けに納品" style="min-height:70px;"></textarea>
+    </div>
     <div class="btns">
-      <button class="btn-ghost" id="voiceCancel">閉じる</button>
-      <button class="btn-primary" id="voiceSave">保存</button>
+      <button class="btn-ghost" id="remixCancel">やめる</button>
+      <button class="btn-primary" id="remixGo">AIで作る</button>
     </div>
   </div>
 </div>
@@ -281,7 +365,22 @@ function init(){
   db.ref("posts").on("value", snap => {
     posts = snap.val() || {};
     render();
+    if ($("tab-analytics").style.display !== "none") renderAnalytics();
   });
+  // 設定タブの初期値
+  db.ref("voice/custom").get()
+    .then(s => { $("voiceInput").value = s.val() || ""; })
+    .catch(() => {});
+  // トークン期限（読めない環境ではそっと非表示）
+  db.ref("config/public/tokenExpiresAt").get()
+    .then(s => {
+      const t = s.val();
+      if (!t) return;
+      const days = Math.floor((t - Date.now()) / 86400000);
+      $("tokenInfo").textContent =
+        `Threads連携の有効期限: あと${days}日` + (days < 7 ? "（まもなく自動更新されます）" : "");
+    })
+    .catch(() => {});
 }
 
 // ===== 表示 =====
@@ -625,22 +724,137 @@ $("editSave").addEventListener("click", async () => {
   toast("保存しました");
 });
 
-// ===== 口調・キャラ設定 =====
-$("settingsBtn").addEventListener("click", async () => {
+// ===== タブ切り替え =====
+document.querySelectorAll(".tabbar button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabbar button").forEach(b => b.classList.toggle("on", b === btn));
+    for (const name of ["posts", "analytics", "settings"]) {
+      $("tab-" + name).style.display = (btn.dataset.tab === name) ? "" : "none";
+    }
+    if (btn.dataset.tab === "analytics") renderAnalytics();
+    window.scrollTo(0, 0);
+  });
+});
+
+// ===== 分析タブ =====
+function renderAnalytics(){
+  const pub = Object.entries(posts).filter(([k, p]) => (p.status || "draft") === "published");
+  const withIns = pub.filter(([k, p]) => p.insights);
+  const sum = f => withIns.reduce((a, [k, p]) => a + (p.insights[f] || 0), 0);
+  $("anTotals").innerHTML = `
+    <div class="an-cell"><b>${pub.length}</b><span>投稿数</span></div>
+    <div class="an-cell"><b>${sum("views")}</b><span>👁 閲覧</span></div>
+    <div class="an-cell"><b>${sum("likes")}</b><span>♥ いいね</span></div>
+    <div class="an-cell"><b>${sum("replies")}</b><span>💬 返信</span></div>`;
+
+  // 閲覧数の多い順ランキング（上位10件）
+  const ranked = withIns.slice()
+    .sort((a, b) => (b[1].insights.views || 0) - (a[1].insights.views || 0));
+  const box = $("anRanking");
+  box.innerHTML = "";
+  if (!ranked.length) {
+    box.innerHTML = `<div class="empty">まだ反応データがありません。<br>投稿の翌朝6:30以降に数字が入ります</div>`;
+  }
+  ranked.slice(0, 10).forEach(([key, p], i) => {
+    const el = document.createElement("div");
+    el.className = "an-rank";
+    el.innerHTML = `
+      <div class="r-top">
+        <span class="r-no">${i + 1}位</span>
+        ${p.category ? `<span class="chip cat">${escapeHtml(p.category)}</span>` : ""}
+        <span>${fmtDay(p.publishedAt || p.scheduledAt)}</span>
+      </div>
+      <div class="r-text" data-act="expand">${escapeHtml(p.text || "")}</div>
+      <div class="insights">
+        <span>👁<b>${p.insights.views ?? 0}</b></span>
+        <span>♥<b>${p.insights.likes ?? 0}</b></span>
+        <span>💬<b>${p.insights.replies ?? 0}</b></span>
+        <span>🔁<b>${(p.insights.reposts ?? 0) + (p.insights.quotes ?? 0)}</b></span>
+      </div>
+      <div class="actions" style="display:flex;gap:6px;margin-top:7px;">
+        <button class="btn-primary" data-remix="1" style="padding:6px 11px;font-size:12px;">この型で新作を作る</button>
+      </div>`;
+    el.addEventListener("click", e => {
+      const t = e.target.closest("[data-act='expand']");
+      if (t) { t.classList.toggle("open"); return; }
+      if (e.target.closest("[data-remix]")) openRemix(key);
+    });
+    box.appendChild(el);
+  });
+
+  // カテゴリ別の平均閲覧数
+  const byCat = {};
+  for (const [k, p] of withIns) {
+    const c = p.category || "未分類";
+    (byCat[c] = byCat[c] || []).push(p.insights.views || 0);
+  }
+  const rows = Object.entries(byCat)
+    .map(([c, arr]) => [c, Math.round(arr.reduce((a, b) => a + b, 0) / arr.length), arr.length])
+    .sort((a, b) => b[1] - a[1]);
+  const max = rows.length ? (rows[0][1] || 1) : 1;
+  $("anCats").innerHTML = rows.length
+    ? rows.map(([c, avg, n]) => `
+      <div class="an-cat">
+        <span style="flex:none;min-width:60px;font-weight:600;">${escapeHtml(c)}</span>
+        <div class="bar"><i style="width:${Math.max(4, Math.round(avg / max * 100))}%"></i></div>
+        <b>${avg}</b><span style="color:var(--ink3);flex:none;">${n}件</span>
+      </div>`).join("")
+    : `<div class="empty">データが貯まるとカテゴリごとの伸びが見えます</div>`;
+}
+
+// ===== この型で新作を作る =====
+let remixKey = null;
+function openRemix(key){
+  remixKey = key;
+  const p = posts[key];
+  if (!p) return;
+  $("remixRef").textContent = p.text || "";
+  $("remixMemo").value = "";
+  $("remixOverlay").classList.add("show");
+}
+$("remixCancel").addEventListener("click", () => $("remixOverlay").classList.remove("show"));
+$("remixGo").addEventListener("click", async () => {
+  const ref = posts[remixKey];
+  const memo = $("remixMemo").value.trim();
+  if (!ref) return;
+  if (!memo) { toast("新しいネタのメモを入れてください"); return; }
+  const btn = $("remixGo");
+  btn.disabled = true; btn.textContent = "生成中…";
+  try {
+    const r = await fetch(GENERATE_CAPTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memo, category: ref.category || "", reference: ref.text || "" }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "生成に失敗しました");
+    const ok = await askConfirm("この内容で下書きに追加しますか？\n\n" + data.text);
+    if (ok) {
+      await db.ref("posts").push({
+        text: data.text,
+        imageUrl: "",
+        category: ref.category || "",
+        status: "draft",
+        scheduledAt: nextFreeSlot(),
+        createdAt: Date.now(),
+        insights: null
+      });
+      $("remixOverlay").classList.remove("show");
+      toast("下書きに追加しました。投稿タブで確認・承認してください");
+    }
+  } catch (err) {
+    console.error(err);
+    toast("生成エラー: " + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "AIで作る";
+  }
+});
+
+// ===== 口調・キャラ設定（設定タブ） =====
+$("voiceSave").addEventListener("click", async () => {
   if (!db) { toast("Firebase未設定です"); return; }
   try {
-    const snap = await db.ref("voice/custom").get();
-    $("voiceInput").value = snap.val() || "";
-  } catch (e) {
-    $("voiceInput").value = "";
-  }
-  $("voiceOverlay").classList.add("show");
-});
-$("voiceCancel").addEventListener("click", () => $("voiceOverlay").classList.remove("show"));
-$("voiceSave").addEventListener("click", async () => {
-  try {
     await db.ref("voice/custom").set($("voiceInput").value.trim());
-    $("voiceOverlay").classList.remove("show");
     toast("保存しました。次のAI文案から反映されます");
   } catch (err) {
     toast("保存エラー: " + err.message);

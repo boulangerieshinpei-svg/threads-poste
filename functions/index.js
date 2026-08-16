@@ -20,7 +20,7 @@ exports.generateCaption = onRequest(
       res.status(405).json({ error: "POSTのみ対応しています" });
       return;
     }
-    const { memo, category } = req.body || {};
+    const { memo, category, reference } = req.body || {};
     if (!memo || typeof memo !== "string" || memo.length > 500) {
       res.status(400).json({ error: "memo（500字以内）が必要です" });
       return;
@@ -47,6 +47,10 @@ exports.generateCaption = onRequest(
       let systemText = VOICE_PROMPT;
       if (examples) {
         systemText += `\n\n## 本人が「良い」と印を付けた投稿の実例（この雰囲気に寄せること）\n${examples}`;
+      }
+      // 分析タブの「この型で新作を作る」: 反応が良かった投稿を型として踏襲させる
+      if (reference && typeof reference === "string" && reference.trim()) {
+        systemText += `\n\n## 反応が良かった投稿（今回はこの投稿の構成・型・雰囲気を踏襲し、メモの内容で新作を書くこと。文章のコピーはしない）\n${reference.trim().slice(0, 600)}`;
       }
       if (customVoice) {
         systemText += `\n\n## 追加の口調・キャラ指示（本人による設定。最優先で必ず従うこと）\n${customVoice}`;
