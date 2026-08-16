@@ -101,7 +101,7 @@
   .post .text.open{display:block;}
   .insights{display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--ink2);}
   .insights span b{font-weight:700;color:var(--ink);margin-left:2px;}
-  .post .actions{display:flex;gap:6px;margin-top:7px;}
+  .post .actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
   .post .actions button{padding:6px 11px;font-size:12px;flex:none;}
   .empty{color:var(--ink3);text-align:center;padding:40px 0;font-size:13px;}
 
@@ -465,10 +465,12 @@ function render(){
     if (st === "draft") {
       actions = `<button class="btn-ok" data-act="approve">承認</button>
                  <button class="btn-primary" data-act="generate">AI文案</button>
+                 <button class="btn-ghost" data-act="check">🔍チェック</button>
                  <button class="btn-ghost" data-act="edit">編集</button>
                  <button class="btn-bad" data-act="delete">削除</button>`;
     } else if (st === "approved") {
       actions = `<button class="btn-ghost" data-act="unapprove">差し戻し</button>
+                 <button class="btn-ghost" data-act="check">🔍チェック</button>
                  <button class="btn-ghost" data-act="edit">編集</button>
                  <button class="btn-bad" data-act="delete">削除</button>`;
     } else if (st === "error") {
@@ -642,6 +644,8 @@ async function onPostAction(key, e){
     toast("下書きに戻しました");
   } else if (act === "generate") {
     await generateCaption(key, e.target.closest("[data-act]"));
+  } else if (act === "check") {
+    await checkAiness(key, e.target.closest("[data-act]"));
   } else if (act === "edit") {
     openEdit(key);
   } else if (act === "delete") {
@@ -677,6 +681,28 @@ async function generateCaption(key, btn){
     toast("生成エラー: " + err.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "AI文案"; }
+  }
+}
+
+// ===== AIっぽさチェック（辛口） =====
+async function checkAiness(key, btn){
+  const p = posts[key];
+  if (!p || !p.text) { toast("本文が空です"); return; }
+  if (btn) { btn.disabled = true; btn.textContent = "検査中…"; }
+  try {
+    const r = await fetch(GENERATE_CAPTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "critique", memo: p.text }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "チェックに失敗しました");
+    await showInfo("🔍 AIっぽさチェック（辛口）\n\n" + data.text);
+  } catch (err) {
+    console.error(err);
+    toast("チェックエラー: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "🔍チェック"; }
   }
 }
 
@@ -865,6 +891,16 @@ $("voiceSave").addEventListener("click", async () => {
 let confirmResolve = null;
 function askConfirm(msg){
   $("confirmMsg").textContent = msg;
+  $("confirmYes").style.display = "";
+  $("confirmNo").textContent = "やめる";
+  $("confirmOverlay").classList.add("show");
+  return new Promise(resolve => { confirmResolve = resolve; });
+}
+// 読むだけのお知らせ表示（OKボタンのみ）
+function showInfo(msg){
+  $("confirmMsg").textContent = msg;
+  $("confirmYes").style.display = "none";
+  $("confirmNo").textContent = "閉じる";
   $("confirmOverlay").classList.add("show");
   return new Promise(resolve => { confirmResolve = resolve; });
 }

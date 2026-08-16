@@ -11,6 +11,24 @@ admin.initializeApp();
 
 const VOICE_PROMPT = readFileSync(path.join(__dirname, "prompts", "voice.md"), "utf8");
 
+// 「AIっぽさチェック」用の辛口編集者プロンプト
+const CRITIQUE_PROMPT = `あなたはSNS文章の辛口編集者。パン屋の店主が書いたことになっているThreads投稿文（卸営業目的）を読み、「AIが書いたっぽく見えないか」を厳しめに判定する。
+
+AIっぽさの典型例（これらを重点的に探す）:
+- 「いかがでしょうか」「〜ですよね」などの読者への過剰な呼びかけ
+- 「魅力」「こだわり」「まさに」「ぜひ」などの常套句
+- 文の長さが均等で、構成が完璧すぎる（人間はもっと崩れる）
+- 内容のない形容詞の羅列、体言止めの乱発
+- 絵文字・記号の使い方が広告っぽい
+- 具体的な数字や固有の事実がなく、誰でも書ける一般論
+
+出力形式（余計な前置きなし）:
+AIっぽさ: ★☆☆☆☆〜★★★★★（★が多いほどAIっぽい）＋一言
+引っかかる箇所: 実際のフレーズを「」で引用して短く指摘（最大5個。なければ書かない）
+直すなら: 修正例を1〜3行
+
+★2以下なら「人間の文章として通る」と言い切り、良い点も1つ挙げる。甘い判定はしない。`;
+
 // フェーズ2: メモ1行＋カテゴリ → Threads向け文案（Anthropic APIプロキシ）
 // APIキーはフロントに置かず、functions/.env の ANTHROPIC_API_KEY のみで扱う
 exports.generateCaption = onRequest(
@@ -20,9 +38,9 @@ exports.generateCaption = onRequest(
       res.status(405).json({ error: "POSTのみ対応しています" });
       return;
     }
-    const { memo, category, reference } = req.body || {};
-    if (!memo || typeof memo !== "string" || memo.length > 500) {
-      res.status(400).json({ error: "memo（500字以内）が必要です" });
+    const { memo, category, reference, mode } = req.body || {};
+    if (!memo || typeof memo !== "string" || memo.length > 600) {
+      res.status(400).json({ error: "memo（600字以内）が必要です" });
       return;
     }
 
@@ -44,19 +62,31 @@ exports.generateCaption = onRequest(
         .map((p, i) => `【お手本${i + 1}】\n${p.text}`)
         .join("\n\n");
 
-      let systemText = VOICE_PROMPT;
-      if (examples) {
-        systemText += `\n\n## 本人が「良い」と印を付けた投稿の実例（この雰囲気に寄せること）\n${examples}`;
-      }
-      // 分析タブの「この型で新作を作る」: 反応が良かった投稿を型として踏襲させる
-      if (reference && typeof reference === "string" && reference.trim()) {
-        systemText += `\n\n## 反応が良かった投稿（今回はこの投稿の構成・型・雰囲気を踏襲し、メモの内容で新作を書くこと。文章のコピーはしない）\n${reference.trim().slice(0, 600)}`;
-      }
-      if (customVoice) {
-        systemText += `\n\n## 追加の口調・キャラ指示（本人による設定。最優先で必ず従うこと）\n${customVoice}`;
+      let systemText;
+      let userText;
+      if (mode === "critique") {
+        // 「AIっぽさチェック」: 文案生成ではなく辛口編集者として判定する
+        systemText = CRITIQUE_PROMPT;
+        if (examples) {
+          systemText += `\n\n## 参考: 本人が「良い」と認めた実際の投稿（この人らしさの基準）\n${examples}`;
+        }
+        userText = `この投稿文をチェック:\n\n${memo}`;
+      } else {
+        systemText = VOICE_PROMPT;
+        if (examples) {
+          systemText += `\n\n## 本人が「良い」と印を付けた投稿の実例（この雰囲気に寄せること）\n${examples}`;
+        }
+        // 分析タブの「この型で新作を作る」: 反応が良かった投稿を型として踏襲させる
+        if (reference && typeof reference === "string" && reference.trim()) {
+          systemText += `\n\n## 反応が良かった投稿（今回はこの投稿の構成・型・雰囲気を踏襲し、メモの内容で新作を書くこと。文章のコピーはしない）\n${reference.trim().slice(0, 600)}`;
+        }
+        if (customVoice) {
+          systemText += `\n\n## 追加の口調・キャラ指示（本人による設定。最優先で必ず従うこと）\n${customVoice}`;
+        }
+        userText = `カテゴリ: ${category || "指定なし"}\nメモ: ${memo}`;
       }
       console.log(
-        `voice設定: ${customVoice ? JSON.stringify(customVoice.slice(0, 80)) : "(なし)"} / お手本: ${favorites.length}件`
+        `mode: ${mode || "generate"} / voice設定: ${customVoice ? JSON.stringify(customVoice.slice(0, 80)) : "(なし)"} / お手本: ${favorites.length}件`
       );
 
       const client = new Anthropic();
@@ -70,10 +100,7 @@ exports.generateCaption = onRequest(
           { type: "text", text: systemText, cache_control: { type: "ephemeral" } },
         ],
         messages: [
-          {
-            role: "user",
-            content: `カテゴリ: ${category || "指定なし"}\nメモ: ${memo}`,
-          },
+          { role: "user", content: userText },
         ],
       });
 
