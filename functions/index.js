@@ -247,3 +247,47 @@ exports.refreshToken = onSchedule(
     console.log(`トークン更新成功。有効期限: ${new Date(expiresAt).toISOString()}`);
   }
 );
+
+// ===================== フェーズ5: インサイト収集 =====================
+
+// 毎朝6:30 JSTに、投稿済み（直近60日）のviews/likes等を取得してDBへ保存
+exports.fetchInsights = onSchedule(
+  { schedule: "30 6 * * *", timeZone: "Asia/Tokyo", region: "us-central1", timeoutSeconds: 300 },
+  async () => {
+    const auth = await getThreadsAuth();
+    const db = admin.database();
+    const snap = await db.ref("posts").get();
+
+    const cutoff = Date.now() - 60 * 24 * 3600 * 1000;
+    const targets = [];
+    snap.forEach((child) => {
+      const p = child.val();
+      if (p.status === "published" && p.threadsPostId && (p.publishedAt || 0) >= cutoff) {
+        targets.push({ key: child.key, id: p.threadsPostId });
+      }
+    });
+
+    let done = 0;
+    for (const t of targets) {
+      try {
+        const res = await fetch(
+          `${THREADS_API}/${t.id}/insights?metric=views,likes,replies,reposts,quotes&access_token=${encodeURIComponent(auth.accessToken)}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(JSON.stringify(data.error || data));
+        const m = { fetchedAt: Date.now() };
+        for (const item of data.data || []) {
+          const v =
+            (item.values && item.values[0] && item.values[0].value) ??
+            (item.total_value && item.total_value.value) ?? 0;
+          m[item.name] = v;
+        }
+        await db.ref(`posts/${t.key}/insights`).set(m);
+        done++;
+      } catch (e) {
+        console.warn(`insights取得失敗 ${t.key}:`, e.message || e);
+      }
+    }
+    console.log(`インサイト更新: ${done}/${targets.length}件`);
+  }
+);

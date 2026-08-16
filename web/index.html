@@ -99,6 +99,8 @@
   .post .text{font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
   .post .text.open{display:block;}
+  .insights{display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--ink2);}
+  .insights span b{font-weight:700;color:var(--ink);margin-left:2px;}
   .post .actions{display:flex;gap:6px;margin-top:7px;}
   .post .actions button{padding:6px 11px;font-size:12px;flex:none;}
   .empty{color:var(--ink3);text-align:center;padding:40px 0;font-size:13px;}
@@ -387,6 +389,12 @@ function render(){
           <div class="text" data-act="expand">${escapeHtml(p.text || "")}</div>
         </div>
       </div>
+      ${p.insights ? `<div class="insights">
+        <span>👁<b>${p.insights.views ?? 0}</b></span>
+        <span>♥<b>${p.insights.likes ?? 0}</b></span>
+        <span>💬<b>${p.insights.replies ?? 0}</b></span>
+        <span>🔁<b>${(p.insights.reposts ?? 0) + (p.insights.quotes ?? 0)}</b></span>
+      </div>` : ""}
       ${actions ? `<div class="actions">${actions}</div>` : ""}
       ${st === "error" && p.lastError ? `<div class="hint">エラー: ${escapeHtml(p.lastError)}</div>` : ""}`;
     el.addEventListener("click", e => onPostAction(key, e));
