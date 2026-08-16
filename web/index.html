@@ -35,7 +35,8 @@
   .summary .s-counts b{font-size:14px;margin-right:2px;font-weight:700;}
 
   /* ===== 追加フォーム ===== */
-  .add-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;}
+  .add-toggle{width:100%;padding:11px;font-size:14px;margin-bottom:8px;}
+  .add-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
   .photo-pick{display:flex;align-items:center;gap:12px;}
   .photo-pick .thumb{width:52px;height:52px;border-radius:10px;background:var(--surface2);
     border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;
@@ -147,8 +148,9 @@
     <div class="s-counts" id="countsLabel"></div>
   </div>
 
-  <!-- 追加フォーム: 写真1枚＋テキスト1行のみ -->
-  <div class="add-card">
+  <!-- 追加フォーム: 写真1枚＋テキスト1行のみ（普段は折りたたみ） -->
+  <button class="btn-primary add-toggle" id="addToggle">＋ ネタを追加</button>
+  <div class="add-card" id="addCard" style="display:none;">
     <div class="photo-pick">
       <label>
         <span class="thumb" id="photoThumb">写真を選ぶ</span>
@@ -290,7 +292,7 @@ function fmtWhen(ts){
 
 const STATUS_LABEL = { draft:"下書き", approved:"承認済み", published:"投稿済み", error:"エラー" };
 
-let filterStatus = "";
+let filterStatus = "active"; // 初期表示は「進行中」（投稿済みを隠す）
 let filterCategory = "";
 let filterFav = false;
 
@@ -335,7 +337,7 @@ function render(){
   const list = $("postList");
   const entries = Object.entries(posts)
     .filter(([k, p]) =>
-      (!filterStatus || (p.status || "draft") === filterStatus) &&
+      matchStatus(p, filterStatus) &&
       (!filterCategory || p.category === filterCategory) &&
       (!filterFav || p.favorite))
     .sort((a,b) => (a[1].scheduledAt||0) - (b[1].scheduledAt||0));
@@ -398,6 +400,14 @@ function escapeHtml(s){
 }
 
 // ===== 追加 =====
+$("addToggle").addEventListener("click", () => {
+  const card = $("addCard");
+  const open = card.style.display === "none";
+  card.style.display = open ? "" : "none";
+  $("addToggle").textContent = open ? "－ 閉じる" : "＋ ネタを追加";
+  if (open) $("memoInput").focus();
+});
+
 $("photoInput").addEventListener("change", e => {
   pickedFile = e.target.files[0] || null;
   const thumb = $("photoThumb");
@@ -447,6 +457,8 @@ $("addBtn").addEventListener("click", async () => {
     renderCatChips();
     $("photoThumb").textContent = "写真を選ぶ";
     $("clearPhotoBtn").style.display = "none";
+    $("addCard").style.display = "none";
+    $("addToggle").textContent = "＋ ネタを追加";
     toast("ストックに追加しました");
   } catch (err) {
     console.error(err);
@@ -645,14 +657,20 @@ $("confirmNo").addEventListener("click", () => {
 
 // ===== 絞り込みバー =====
 const STATUS_FILTERS = [
-  ["", "すべて"], ["draft", "下書き"], ["approved", "承認済み"],
+  ["active", "進行中"], ["", "すべて"], ["draft", "下書き"], ["approved", "承認済み"],
   ["published", "投稿済み"], ["error", "エラー"],
 ];
+function matchStatus(p, val){
+  const st = p.status || "draft";
+  if (!val) return true;
+  if (val === "active") return st !== "published";
+  return st === val;
+}
 function renderFilterBar(){
   const bar = $("filterBar");
   bar.innerHTML = "";
   const all = Object.values(posts);
-  const countOf = (val) => val ? all.filter(p => (p.status || "draft") === val).length : all.length;
+  const countOf = (val) => all.filter(p => matchStatus(p, val)).length;
   for (const [val, label] of STATUS_FILTERS) {
     const b = document.createElement("button");
     b.type = "button";
