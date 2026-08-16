@@ -25,9 +25,9 @@ AIっぽさの典型例（これらを重点的に探す）:
 出力形式（余計な前置きなし）:
 AIっぽさ: ★☆☆☆☆〜★★★★★（★が多いほどAIっぽい）＋一言
 引っかかる箇所: 実際のフレーズを「」で引用して短く指摘（最大5個。なければ書かない）
-直すなら: 修正例を1〜3行
 
-★2以下なら「人間の文章として通る」と言い切り、良い点も1つ挙げる。甘い判定はしない。`;
+★2以下なら「人間の文章として通る」と言い切り、良い点を1つ挙げて終わる。甘い判定はしない。
+★3以上なら、指摘のあとに単独行で「---改善版---」と書き、続けて修正した投稿文の完成版だけを出力する（解説なし。本人の口調と内容の事実は保ち、捏造しない）。`;
 
 // フェーズ2: メモ1行＋カテゴリ → Threads向け文案（Anthropic APIプロキシ）
 // APIキーはフロントに置かず、functions/.env の ANTHROPIC_API_KEY のみで扱う
@@ -69,6 +69,9 @@ exports.generateCaption = onRequest(
         systemText = CRITIQUE_PROMPT;
         if (examples) {
           systemText += `\n\n## 参考: 本人が「良い」と認めた実際の投稿（この人らしさの基準）\n${examples}`;
+        }
+        if (customVoice) {
+          systemText += `\n\n## 本人の口調・キャラ設定（改善版を書くときはこれに従う）\n${customVoice}`;
         }
         userText = `この投稿文をチェック:\n\n${memo}`;
       } else {
@@ -117,6 +120,15 @@ exports.generateCaption = onRequest(
 
       if (!text) {
         res.status(502).json({ error: "空の文案が返されました。再試行してください" });
+        return;
+      }
+
+      // チェックモードは「判定」と「改善版」を分けて返す（改善版はAIっぽい時のみ付く）
+      if (mode === "critique") {
+        const parts = text.split(/\n-{2,}\s*改善版\s*-{2,}\s*\n?/);
+        const critique = parts[0].trim();
+        const improved = (parts[1] || "").trim();
+        res.json(improved ? { text: critique, improved } : { text: critique });
         return;
       }
 

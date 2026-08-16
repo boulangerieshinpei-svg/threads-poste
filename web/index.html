@@ -697,7 +697,18 @@ async function checkAiness(key, btn){
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "チェックに失敗しました");
-    await showInfo("🔍 AIっぽさチェック（辛口）\n\n" + data.text);
+    if (data.improved) {
+      const ok = await askConfirm(
+        "🔍 AIっぽさチェック（辛口）\n\n" + data.text +
+        "\n\n――― 改善版 ―――\n" + data.improved,
+        "改善版に置き換える", "そのままでいい");
+      if (ok) {
+        await db.ref(`posts/${key}/text`).set(data.improved);
+        toast("改善版を反映しました");
+      }
+    } else {
+      await showInfo("🔍 AIっぽさチェック（辛口）\n\n" + data.text);
+    }
   } catch (err) {
     console.error(err);
     toast("チェックエラー: " + err.message);
@@ -889,10 +900,11 @@ $("voiceSave").addEventListener("click", async () => {
 
 // ===== 確認モーダル =====
 let confirmResolve = null;
-function askConfirm(msg){
+function askConfirm(msg, yesLabel, noLabel){
   $("confirmMsg").textContent = msg;
   $("confirmYes").style.display = "";
-  $("confirmNo").textContent = "やめる";
+  $("confirmYes").textContent = yesLabel || "実行する";
+  $("confirmNo").textContent = noLabel || "やめる";
   $("confirmOverlay").classList.add("show");
   return new Promise(resolve => { confirmResolve = resolve; });
 }
