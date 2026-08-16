@@ -49,8 +49,8 @@ service firebase.storage {
 
 | フェーズ | 内容 | 状態 |
 |---|---|---|
-| 1 | 投稿ストック管理画面 | 実装済み |
-| 2 | AI文案生成（Cloud Functions + Anthropic API） | 未着手 |
-| 3 | 定時自動投稿（Cloud Scheduler + Threads API） | 未着手 |
-| 4 | トークン自動リフレッシュ | 未着手 |
+| 1 | 投稿ストック管理画面 | ✅ 稼働中 |
+| 2 | AI文案生成（Cloud Functions + Anthropic API） | ✅ 稼働中 |
+| 3 | 定時自動投稿（Cloud Scheduler + Threads API） | ✅ 稼働中（2026-08-16 初投稿成功） |
+| 4 | トークン自動リフレッシュ | ✅ 稼働中（毎週月曜4時） |
 | 5 | インサイト週次レポート | 未着手 |
