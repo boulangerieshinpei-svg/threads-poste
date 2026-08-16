@@ -45,12 +45,15 @@ exports.generateCaption = onRequest(
         .join("\n\n");
 
       let systemText = VOICE_PROMPT;
-      if (customVoice) {
-        systemText += `\n\n## 追加の口調・キャラ指示（本人による設定。優先して従うこと）\n${customVoice}`;
-      }
       if (examples) {
         systemText += `\n\n## 本人が「良い」と印を付けた投稿の実例（この雰囲気に寄せること）\n${examples}`;
       }
+      if (customVoice) {
+        systemText += `\n\n## 追加の口調・キャラ指示（本人による設定。最優先で必ず従うこと）\n${customVoice}`;
+      }
+      console.log(
+        `voice設定: ${customVoice ? JSON.stringify(customVoice.slice(0, 80)) : "(なし)"} / お手本: ${favorites.length}件`
+      );
 
       const client = new Anthropic();
       const response = await client.beta.messages.create({
