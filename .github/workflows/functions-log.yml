@@ -1,0 +1,18 @@
+name: Show Function Logs
+
+# 手動実行するとCloud Functionsの最近のログを表示する（コンソールに入れない時用）
+on:
+  workflow_dispatch:
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Show recent function logs
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          npx firebase-tools@14 functions:log --project threads-poster-2da7a -n 200
