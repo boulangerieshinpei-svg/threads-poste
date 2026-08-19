@@ -1,6 +1,7 @@
 name: Show Function Logs
 
-# 手動実行するとCloud Functionsの最近のログを表示する（コンソールに入れない時用）
+# 手動実行すると直近3日分のCloud Functionsログを表示する（コンソールに入れない時用）
+# client_id / client_secret はFirebase CLI共通の公開値（秘密情報ではない）
 on:
   workflow_dispatch:
 
@@ -8,11 +9,29 @@ jobs:
   logs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Show recent function logs
+      - name: Fetch recent logs from Cloud Logging
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          npx firebase-tools@14 functions:log --project threads-poster-2da7a -n 200
+          ACCESS_TOKEN=$(curl -s https://oauth2.googleapis.com/token \
+            -d client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com \
+            -d client_secret=j9iVZfS8kkCEFUPaAeJV0sAi \
+            -d grant_type=refresh_token \
+            -d refresh_token="$FIREBASE_TOKEN" | jq -r .access_token)
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "アクセストークンの取得に失敗しました"; exit 1
+          fi
+          SINCE=$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          cat > body.json <<EOF
+          {
+            "resourceNames": ["projects/threads-poster-2da7a"],
+            "filter": "resource.type=\"cloud_run_revision\" AND timestamp>=\"$SINCE\" AND NOT logName:\"requests\"",
+            "orderBy": "timestamp desc",
+            "pageSize": 200
+          }
+          EOF
+          curl -s https://logging.googleapis.com/v2/entries:list \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d @body.json \
+            | jq -r '.entries[]? | [.timestamp, (.resource.labels.service_name // "-"), (.severity // "-"), ((.textPayload // (.jsonPayload.message // (.jsonPayload|tostring)) // "") | tostring | .[0:300])] | @tsv'
