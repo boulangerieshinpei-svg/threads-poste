@@ -30,8 +30,15 @@ jobs:
             "pageSize": 200
           }
           EOF
-          curl -s https://logging.googleapis.com/v2/entries:list \
+          echo "SINCE=$SINCE"
+          RESP=$(curl -s https://logging.googleapis.com/v2/entries:list \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
-            -d @body.json \
-            | jq -r '.entries[]? | [.timestamp, (.resource.labels.service_name // "-"), (.severity // "-"), ((.textPayload // (.jsonPayload.message // (.jsonPayload|tostring)) // "") | tostring | .[0:300])] | @tsv'
+            -d @body.json)
+          echo "$RESP" | jq -r '.entries[]? | [.timestamp, (.resource.labels.service_name // "-"), (.severity // "-"), ((.textPayload // (.jsonPayload.message // (.jsonPayload|tostring)) // "") | tostring | .[0:300])] | @tsv' > out.txt || true
+          if [ -s out.txt ]; then
+            cat out.txt
+          else
+            echo "---- entriesなし。生レスポンス（先頭2000文字）: ----"
+            echo "$RESP" | head -c 2000
+          fi
