@@ -214,12 +214,19 @@ exports.publishScheduled = onSchedule(
 
     const snap = await db.ref("posts").get();
     const due = [];
+    const failed = [];
     snap.forEach((child) => {
       const p = child.val();
-      if (p.status === "approved" && p.scheduledAt && p.scheduledAt <= now) {
-        due.push({ key: child.key, ...p });
-      }
+      if (!p.scheduledAt || p.scheduledAt > now) return;
+      if (p.status === "approved") due.push({ key: child.key, ...p });
+      // 過去にエラーになった投稿も自動で再挑戦する（承認済みが無い回に1件ずつ）
+      // Meta側の一時ブロックなどが解けたら、人の操作なしで勝手に復活するため
+      if (p.status === "error") failed.push({ key: child.key, ...p });
     });
+    if (due.length === 0 && failed.length > 0) {
+      console.log(`承認済みなし。エラー投稿の自動再挑戦: ${failed.length}件中1件`);
+      due.push(...failed);
+    }
     if (due.length === 0) {
       console.log("投稿対象なし（承認済みで予定時刻到来のものがない）");
       return;
