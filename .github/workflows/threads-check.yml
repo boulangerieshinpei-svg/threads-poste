@@ -1,0 +1,17 @@
+name: Threads API Check
+
+# 手動実行するとThreads APIに接続できるか確認する（ブロック解除チェック用）
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Threads API /me
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+        run: |
+          RESP=$(curl -s "https://graph.threads.net/v1.0/me?fields=id,username&access_token=$THREADS_ACCESS_TOKEN")
+          # トークン値そのものは出さず、結果だけ表示
+          echo "$RESP" | jq '{username: .username, id_present: (.id != null), error: .error}'
